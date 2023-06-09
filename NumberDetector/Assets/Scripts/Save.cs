@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -12,15 +11,20 @@ public class Save : MonoBehaviour
     [SerializeField]
     TileBase emptyTile;
     bool[] imgBool;
+   
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Return))
+        for (int i = 0; i < 10; i++)
         {
-            SaveCurrentImage();
+            if (Input.GetKeyDown((KeyCode)(48 + i)))
+            {
+                SaveCurrentImage(i);
+            }
         }
+
     }
-    void SaveCurrentImage()
+    void SaveCurrentImage(int imageNumber)
     {
         imgBool = new bool[784];
         for (int i = 0; i < 28; i++)
@@ -47,7 +51,7 @@ public class Save : MonoBehaviour
 
         }
 
-        image.correctOutput = 42;
+        image.correctOutput = imageNumber;
         // Load existing JSON data into a list
         if (File.Exists(Application.dataPath + "/saveFile.json"))
         {
@@ -56,7 +60,7 @@ public class Save : MonoBehaviour
 
         }
         // Add new data to the list
-        print(tempImageList == null);        
+        print(tempImageList == null);
         tempImageList.Add(image);
 
         JsonableListWrapper<Image> wrappedList = new(tempImageList);
@@ -65,12 +69,7 @@ public class Save : MonoBehaviour
         print(listAsJson);
         File.WriteAllText(Application.dataPath + "/saveFile.json", listAsJson);
     }
-    [Serializable]
-    private class Image
-    {
-        public bool[] imgBool = new bool[784];
-        public int correctOutput;
-    }
+
 }
 [Serializable]
 public class JsonableListWrapper<T>
@@ -88,4 +87,10 @@ public class JsonableListWrapper<T>
     // From Json
     List<string> stringListFromJson = JsonUtility.FromJson<JsonableListWrapper<string>>(stringListAsJson).list;
     */
+}
+[Serializable]
+public class Image
+{
+    public bool[] imgBool = new bool[784];
+    public int correctOutput;
 }
