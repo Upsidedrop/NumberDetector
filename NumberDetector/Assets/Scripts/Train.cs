@@ -1,4 +1,7 @@
+using System.Collections;
+using System.Collections.Generic;
 using System.IO;
+using TMPro;
 using UnityEngine;
 
 public class Train : MonoBehaviour
@@ -10,9 +13,20 @@ public class Train : MonoBehaviour
     Image image;
     float[] changes;
     float[] nextChanges;
-    readonly float changeSensitivity = 0.1f;
+    List<Image> imageList = new List<Image>();
+    readonly float changeSensitivity = 0.05f;
+    public bool isTraining = false;
+    int result;
+    float resultProbability;
+    float instances = 0;
+    float correctInstances = 0;
+    [SerializeField]
+    TMP_Text text;
+    public float cost = 0;
     private void Awake()
     {
+        imageList = JsonUtility.FromJson<JsonableListWrapper<Image>>(File.ReadAllText(Application.dataPath + "/saveFile.json"))
+                           .list;
         CreateNodes();
     }
     class Node
@@ -143,19 +157,21 @@ public class Train : MonoBehaviour
         {
             if (image.correctOutput == i)
             {
-                changes[i] = 1 - nodes[5][i].value;
+                changes[i] = 1 - nodes[nodes.Length - 1][i].value;
             }
             else
             {
-                changes[i] = 0 - nodes[5][i].value;
+                changes[i] = 0 - nodes[nodes.Length - 1][i].value;
             }
+
         }
-        print(CalculateCost());
+        CalculateCost();
+        print("Cost:" + cost);
         for (int i = 0; i < nodes.Length; i++)
         {
             for (int i1 = 0; i1 < nodesPerLayer; i1++)
             {
-                ChangeActivations(changes[i1], 5 - i, i1);
+                ChangeActivations(changes[i1], (nodes.Length - 1) - i, i1);
             }
             for (int i2 = 0; i2 < nodesPerLayer; i2++)
             {
@@ -163,7 +179,6 @@ public class Train : MonoBehaviour
                 nextChanges[i2] = 0;
             }
         }
-
     }
     void ChangeActivations(float change, int nodeLayer, int nodeIndex)
     {
@@ -173,7 +188,7 @@ public class Train : MonoBehaviour
         {
             for (int i = 0; i < inputs.Length; i++)
             {
-                nodes[nodeLayer][nodeIndex].inputWeights[i] = inputs[i] * averageChange;
+                nodes[nodeLayer][nodeIndex].inputWeights[i] += inputs[i] * averageChange;
             }
 
         }
@@ -181,7 +196,7 @@ public class Train : MonoBehaviour
         {
             for (int i = 0; i < nodesPerLayer; i++)
             {
-                nodes[nodeLayer][nodeIndex].inputWeights[i] = nodes[nodeLayer - 1][i].value * averageChange;
+                nodes[nodeLayer][nodeIndex].inputWeights[i] += nodes[nodeLayer - 1][i].value * averageChange;
                 nextChanges[i] += nodes[nodeLayer][nodeIndex].inputWeights[i] * averageChange;
             }
 
@@ -190,26 +205,80 @@ public class Train : MonoBehaviour
     }
     float LogSigmoid(float x)
     {
+
         if (x < -45.0) return 0.0f;
         else if (x > 45.0) return 1.0f;
         else return 1.0f / (1.0f + Mathf.Exp(-x));
     }
     public void CallMethods()
     {
-
+        dataIndex = Random.Range(0, /*imageList.Count - 1*/ 2);
         AssignInputs();
         AssignNodes();
+        FindMostLikelyNumber();
+        instances++;
+        if (result == image.correctOutput)
+        {
+            correctInstances++;
+        }
+        
+        print("Estimated Number:" + result);
+        print("Actual Number:" + image.correctOutput);
+        print("Certainty: " + resultProbability);
         BackPropogation();
+        StartCoroutine(Delay());
+
     }
-    float CalculateCost()
+    void CalculateCost()
     {
-        float cost = 0;
+        cost = 0;
         for (int i = 0; i < nodesPerLayer; i++)
         {
-            cost += Mathf.Pow(nodes[5][i].value - changes[i], 2);
+            cost += Mathf.Pow(changes[i], 2);
         }
-        return cost;
     }
+    void FindMostLikelyNumber()
+    {
+        result = 0;
+        resultProbability = 0;
+        for (int i = 0; i < nodesPerLayer; i++)
+        {
+            if (nodes[nodes.Length - 1][i].value > resultProbability)
+            {
+                resultProbability = nodes[nodes.Length - 1][i].value;
+                result = i;
+            }
+        }
+    }
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            isTraining = !isTraining;
+            if (isTraining)
+            {
+                CallMethods();
+            }
+        }
 
+    }
+    IEnumerator Delay()
+    {
+        UpdateText();
+        yield return new WaitForSeconds(0.0001f);
+        if (isTraining)
+        {
+            CallMethods();
+        }
+    }
+    void UpdateText()
+    {
+        text.text = Mathf.Round(correctInstances / instances * 100) + "% Accuracy";
+        if (instances > 1000)
+        {
+            instances = 0;
+            correctInstances = 0;
+        }
+    }
 }
 
